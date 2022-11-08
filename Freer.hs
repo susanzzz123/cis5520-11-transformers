@@ -5,7 +5,7 @@ fulltitle: "Optional module: The Freer Monad"
 date: November 14, 2022
 ---
 
-This module is an alternative approach to Monad Transformers, as shown in the [Transformers](11-transformers/Transformers.html) module. It is optional material, intended to demonstrate recent work in using Haskell's type system to track effectful code. It also introduces (at the very end) the concept of a "Freer Monad" --- the essence of the monad type class and a way to describe computation abstractly. This module is based on and uses the same running examples as in the `Transformers` module for easy comparison.
+This module is an alternative approach to Monad Transformers, as shown in the [Transformers](Transformers.html) module. It is optional material, intended to demonstrate recent work in using Haskell's type system to track effectful code. It also introduces (at the very end) the concept of a "Freer Monad" --- the essence of the monad type class and a way to describe computation abstractly. This module is based on and uses the same running examples as in the `Transformers` module for easy comparison.
 
 This module relies on the
 [`freer-simple`](https://hackage.haskell.org/package/freer-simple) library,
@@ -34,7 +34,7 @@ defined.
 -}
 
 {-
-We'll also use our old friend the `State` monad, that we defined last week [`State`](10-state/State.lhs)
+We'll also use our old friend the `State` monad, that we defined last week [`State`](../09-state/State.html)
 and is included in this project for convenience. Because some of the names in the `freer-simple` library above
 conflict with the names in the `State` module, we'll also import this one qualified by the prefix `StateMonad`.
 -}
