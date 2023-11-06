@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: LSyntax"
+date: November 15, 2023
 ---
 
 This file defines the abstract syntax for a simple imperative programming (L)
@@ -24,9 +25,11 @@ newtype Block
   deriving (Eq, Show)
 
 instance Semigroup Block where
+  (<>) :: Block -> Block -> Block
   Block s1 <> Block s2 = Block (s1 <> s2)
 
 instance Monoid Block where
+  mempty :: Block
   mempty = Block []
 
 {-

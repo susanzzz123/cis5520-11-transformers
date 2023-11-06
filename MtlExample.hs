@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: "MtlExample"
+date: November 13, 2023
 ---
 
 This file demonstrates the use of the `mtl` library

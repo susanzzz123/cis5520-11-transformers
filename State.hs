@@ -1,43 +1,46 @@
 {-
 ---
 fulltitle: A Generic State Transformer
+date:
 ---
--}
-{-# LANGUAGE GADTs #-}
 
-{-
 This file goes with [`StateMonad`](StateMonad.html).
 
 Since state is a handy thing to have, the Haskell standard library includes a
-[module][1] `Control.Monad.State` that defines a parameterized version of the
-state-transformer monad.  This file is a simplified version of that library.
+[module][1] `Control.Monad.State` that defines a generic version of the
+state-transformer that we saw in the [`StateMonad`](StateMonad.html).
+This file is a simplified version of that library.
 
-This module includes an explicit export list.  As a result, only the types and
-functions listed below will be visible to clients of the module.  Furthermore,
-the type `State` is exported *abstractly*, i.e. without its data constructor
+This module defines an *abstract* type, `State` that can only be used according
+to its interface. Clients are prevented from knowing the implementation of
+the `State` type --- this implmentation is private to this module.
+
+To make this type abstract, the module definition includes an explicit export list.
+As a result, only the types and functions listed below will be visible to clients
+of the module.  Furthermore, the type `State` is exported without its data constructor
 `S`. That means that clients of this module cannot use `S`, not even for pattern
 matching.
 -}
 
-module State (State, get, put, modify, state, runState, evalState, execState) where
+module State (State, get, put, modify, runState, evalState, execState) where
 
 import Control.Monad (ap, liftM)
 
 {-
-The type definition for a generic state transformer is very simple, and almost
+The type definition for a generic state transformer is very simple and almost
 identical to the `ST2` type from before:
 -}
 
-newtype State s a = S {runState :: s -> (a, s)}
+newtype State s a = S (s -> (a, s))
 
-state :: (s -> (a, s)) -> State s a
-state = S
+runState :: State s a -> s -> (a, s)
+runState (S f) = f
 
 {-
 This type is a parameterized state-transformer monad where the state is
 denoted by type `s` and the return value of the transformer is the
 type `a`. We make the above a monad by declaring it to be an instance
-of the `Monad` typeclass
+of the `Applicative` and `Monad` typeclasses.
 -}
 
 instance Monad (State s) where
@@ -50,17 +53,17 @@ instance Monad (State s) where
      in runState (f a) s'
 
 {-
-Starting with GHC 7.10, all monads must also be a member of `Functor` and
-`Applicative`. However, we can use functions from `Control.Monad` to define
-these instances in a generic way.  (You might try to redefine them yourself
-for fun!)
+We also define instances for `Functor` and `Applicative`:
 -}
 
 instance Functor (State s) where
+  fmap :: (a -> b) -> State s a -> State s b
   fmap = liftM
 
 instance Applicative (State s) where
+  pure :: a -> State s a
   pure = return
+  (<*>) :: State s (a -> b) -> State s a -> State s b
   (<*>) = ap
 
 {-
@@ -114,9 +117,7 @@ a new state *inside* a state monad. The old state is thrown away.
 -}
 
 modify :: (s -> s) -> State s ()
-modify f = do
-  s <- get
-  put (f s)
+modify f = S $ \s -> ((), f s)
 
 {-
 [1]: http://hackage.haskell.org/packages/archive/mtl/latest/doc/html/Control-Monad-State-Lazy.html#g:2
