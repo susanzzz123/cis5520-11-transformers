@@ -1,10 +1,11 @@
 {-
 ---
-fulltitle: "In class exercise: TransExercise"
+fulltitle: "In class exercise: Monad Transformers"
+date: November 15, 2023
 ---
 -}
 
-module TransExercise where
+module TransformersExercise where
 
 {-
 This exercise involves using monad transformers to extend a simple imperative
@@ -13,9 +14,9 @@ This exercise involves using monad transformers to extend a simple imperative
  homework assignment, with the addition of `throw` and `try` statements.
 
 * For simplicity, we define the syntax of this extended language in a [separate
-file](LSyntax.hs).
+file](LSyntax.html).
 
-* The test case [try.l](try.l) demonstrates the syntax for exceptions in
+* The test case `try.l`, included in the project, demonstrates the syntax for exceptions in
   the extended language.
 
 This exercise will give you practice with the `MonadState` and `MonadError`
@@ -193,8 +194,8 @@ evalS w@(While e ss) = do
   when (evalCondition v) $ do
     eval ss
     evalS w
-evalS (Try _ _ _) = error "evalS: unimplemented"
-evalS (Throw _) = error "evalS: unimplemented"
+evalS (Try _ _ _) = undefined
+evalS (Throw _) = undefined
 
 -- type annotation intentionally not given
 eval (Block ss) = mapM_ evalS ss
@@ -263,7 +264,22 @@ Note: the `catchError` function in
 [Control.Monad.Except](https://hackage.haskell.org/package/mtl-2.2.1/docs/Control-Monad-Except.html)
 will be necessary for `Try` statements.
 
-For example, this block is the abstract syntax for [try.l](try.l).
+For example, this `L` program (also in `try.l`)
+
+~~~~~~~~~~~~~~~~~~~~~
+x = 0
+y = 1
+try
+  if (x + y) then
+     a = 100
+     throw (x + y)
+     b = 200
+  else end
+handle e with
+  z = e + a
+~~~~~~~~~~~~~~~~~~~~
+
+can be represented with with this AST.
 -}
 
 tryExpr :: Block
