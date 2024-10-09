@@ -1,7 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: Monad Transformers"
-date: November 15, 2023
+date: November 13, 2024
 ---
 -}
 
@@ -13,10 +13,10 @@ This exercise involves using monad transformers to extend a simple imperative
  language is a minimal subset of the `Lu` programming language from your
  homework assignment, with the addition of `throw` and `try` statements.
 
-* For simplicity, we define the syntax of this extended language in a [separate
+\* For simplicity, we define the syntax of this extended language in a [separate
 file](LSyntax.html).
 
-* The test case `try.l`, included in the project, demonstrates the syntax for exceptions in
+\* The test case `try.l`, included in the project, demonstrates the syntax for exceptions in
   the extended language.
 
 This exercise will give you practice with the `MonadState` and `MonadError`
@@ -30,7 +30,7 @@ import Control.Monad (when)
 import Control.Monad.Except (ExceptT, MonadError (..), runExceptT)
 import Control.Monad.State (MonadState (..), State, StateT, runState, runStateT)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import LSyntax
   ( Block (..),
     Bop (..),
@@ -299,7 +299,7 @@ Displaying the results
 -}
 
 -- display the result of evaluation
-display :: Show a => Either Value a -> String
+display :: (Show a) => Either Value a -> String
 display (Left v) = "Uncaught exception: " ++ displayExn v
 display (Right v) = "Result: " ++ show v
 

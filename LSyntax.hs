@@ -1,7 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: LSyntax"
-date: November 15, 2023
+date: November 13, 2024
 ---
 
 This file defines the abstract syntax for a simple imperative programming (L)

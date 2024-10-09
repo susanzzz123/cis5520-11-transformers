@@ -1,7 +1,7 @@
 {-
 ---
 fulltitle: Monad Transformers
-date: November 13, 2023
+date: November 11, 2024
 ---
 
 -}
@@ -12,7 +12,7 @@ import Control.Monad (ap, liftM)
 import Data.Function ((&))
 import Data.Kind (Type)
 import State (State)
-import qualified State as S
+import State qualified as S
 
 {-
 How do we use *multiple* monads at once?
@@ -102,7 +102,7 @@ Try to use the `Either` monad (with do notation) to write a better exception-
 throwing evaluator, where the helper function `errorS` generates the error string.
 -}
 
-errorS :: Show a => a -> a -> String
+errorS :: (Show a) => a -> a -> String
 errorS y m = "Error dividing " ++ show y ++ " by " ++ show m
 
 -- | exception-throwing evaluator
@@ -218,7 +218,7 @@ So, at the moment, it seems that monads can do many things, but only *one
 thing at a time* -- you can either use a monad to do the error- management
 plumbing *or* to do the state-manipulation plumbing, but not both at the same
 time.  Is it too much ask for both? I guess we could write a
-*mega-state-and-exception* monad that supports the operations of both, but
+\*mega-state-and-exception* monad that supports the operations of both, but
 that doesn't sound fun!  Especially since, if we later decide to add yet
 another feature, then we would have to make up yet another mega-monad.
 
@@ -248,11 +248,11 @@ Step 1: *Describing* Monads With Special Features
 
 The first step to being able to compose monads is to define typeclasses that
 describe monads *with* particular features. For example, the notion of an
-*exception monad* is captured by the typeclass that describes monads that are
+\*exception monad* is captured by the typeclass that describes monads that are
 also equipped with an appropriate `throwError` function.
 -}
 
-class Monad m => MonadError e m where
+class (Monad m) => MonadError e m where
   throwError :: e -> m a
 
 {-
@@ -278,7 +278,7 @@ that describes monads equipped with extraction (get) and modification (put)
 functions of appropriate types.
 -}
 
-class Monad m => MonadState s m where
+class (Monad m) => MonadState s m where
   get :: m s
   put :: s -> m ()
 
@@ -286,7 +286,7 @@ class Monad m => MonadState s m where
 We can then redefine the ticking operation to work for any state monad:
 -}
 
-tickMonadState :: MonadState Int m => m ()
+tickMonadState :: (MonadState Int m) => m ()
 tickMonadState = do
   (x :: Int) <- get
   put (x + 1)
@@ -296,7 +296,14 @@ Naturally, we can make our `State` monad an instance of the above:
 -}
 
 instance MonadState s (State s) where
+  get :: State s s
   get = S.get
+
+  {-
+  >
+  -}
+
+  put :: s -> State s ()
   put = S.put
 
 {-
@@ -399,7 +406,7 @@ Step 3: Adding Features to Existing Monads
 To add new features to existing monads, we use *monad transformers* --
 type operators `t` that map a monad `m` to a new monad `t m`.
 
-**A Transformer For Exceptions**
+\**A Transformer For Exceptions**
 
 Consider the following datatype declaration:
 -}
@@ -423,7 +430,7 @@ to (a) work with the newtype (using `MkExc` and `runExceptT`) and (b) use return
 `>>=` from the monad `m` to glue computations together.
 -}
 
-instance Monad m => Monad (ExceptT e m) where
+instance (Monad m) => Monad (ExceptT e m) where
   return :: forall a. a -> ExceptT e m a
   return x = MkExc (return (Right x) :: m (Either e a))
 
@@ -436,11 +443,11 @@ instance Monad m => Monad (ExceptT e m) where
                 Right a -> runExceptT (f a)
             )
 
-instance Monad m => Applicative (ExceptT e m) where
+instance (Monad m) => Applicative (ExceptT e m) where
   pure = return
   (<*>) = ap
 
-instance Monad m => Functor (ExceptT e m) where
+instance (Monad m) => Functor (ExceptT e m) where
   fmap = liftM
 
 {-
@@ -450,12 +457,12 @@ equipping it with `throwError`.
 Compare this definition to that of `MonadError e (Either e)` above.
 -}
 
-instance Monad m => MonadError e (ExceptT e m) where
+instance (Monad m) => MonadError e (ExceptT e m) where
   throwError :: e -> ExceptT e m a
   throwError msg = MkExc (return (Left msg))
 
 {-
-**A Transformer For State**
+\**A Transformer For State**
 
 Next, we will build a transformer for the state monad, following more or less
 the same recipe as we did for exceptions. Here is the definition for the
@@ -481,7 +488,7 @@ Next, we declare that the transformer's output is a monad. Again, compare the
 definitions below to that of the `State` monad.
 -}
 
-instance Monad m => Monad (StateT s m) where
+instance (Monad m) => Monad (StateT s m) where
   return :: a -> StateT s m a
   return x = MkStateT $ \s -> return (x, s)
 
@@ -490,11 +497,11 @@ instance Monad m => Monad (StateT s m) where
     (r, s') <- runStateT p s
     runStateT (f r) s'
 
-instance Monad m => Applicative (StateT s m) where
+instance (Monad m) => Applicative (StateT s m) where
   pure = return
   (<*>) = ap
 
-instance Monad m => Functor (StateT s m) where
+instance (Monad m) => Functor (StateT s m) where
   fmap = liftM
 
 {-
@@ -503,7 +510,7 @@ equipping it with the operations from `MonadState Int`. You fill
 in these definitions.
 -}
 
-instance Monad m => MonadState s (StateT s m) where
+instance (Monad m) => MonadState s (StateT s m) where
   get :: StateT s m s
   get = MkStateT getIt
     where
@@ -519,16 +526,16 @@ instance Monad m => MonadState s (StateT s m) where
 {-
 Where are we now?
 
-* If m is a monad, then StateT s m  is a state monad  (i.e. an instance of MonadState)
-* If m is a monad, then ExceptT e m is an error monad (i.e. an instance of MonadError)
+\* If m is a monad, then StateT s m  is a state monad  (i.e. an instance of MonadState)
+\* If m is a monad, then ExceptT e m is an error monad (i.e. an instance of MonadError)
 
 But, what about `StateT s (ExceptT e m)`?  We know it is a state monad by the
 above.  But, we'd *also* like it to be an error monad.
 
 In other words, we need the following "pass through" properties to hold:
 
-* If m is a *state* monad, then `ExceptT e` m is still a state monad
-* If m is an *error* monad, then `StateT Int` m is still an error monad
+\* If m is a *state* monad, then `ExceptT e` m is still a state monad
+\* If m is an *error* monad, then `StateT Int` m is still an error monad
 
 We can do this in a generic way.
 
@@ -545,12 +552,12 @@ would like to be able to lift `get` and `set` so that they work for `ExceptT e
 In general, this function will allow us to transfer operations from the old
 monad into the transformed monad: any operation on the input monad `m` can be
 directly lifted into the transformed monad, and so the transformation
-*preserves* all the operations of the original monad.
+\*preserves* all the operations of the original monad.
 
 -}
 
 class MonadTrans (t :: (Type -> Type) -> Type -> Type) where -- from Control.Monad.Trans (among other places)
-  lift :: Monad m => m a -> t m a
+  lift :: (Monad m) => m a -> t m a
 
 {-
 It is easy to formally state that `ExceptT e` is a bona-fide transformer by
@@ -559,7 +566,7 @@ making it an instance of the `MonadTrans` class:
 -}
 
 instance MonadTrans (ExceptT e) where
-  lift :: Monad m => m a -> ExceptT e m a
+  lift :: (Monad m) => m a -> ExceptT e m a
   -- Recall the type of MkExc
   -- MkExc :: m (Either e a) -> ExceptT e m a
   lift = MkExc . lift_
@@ -572,7 +579,7 @@ Similarly, for the state monad transformer:
 -}
 
 instance MonadTrans (StateT s) where
-  lift :: Monad m => m a -> StateT s m a
+  lift :: (Monad m) => m a -> StateT s m a
   -- Recall the type of MkStateT
   -- MkStateT  :: (s -> m (a,s)) -> StateT s m a
   lift ma = MkStateT $ \s -> do
@@ -584,7 +591,7 @@ Using `lift`, we can ensure that, if a monad was already an
 "error" monad, then the result of the state transformer is too:
 -}
 
-instance MonadError e m => MonadError e (StateT s m) where
+instance (MonadError e m) => MonadError e (StateT s m) where
   throwError :: e -> StateT s m a
   throwError = lift . throwError
 
@@ -594,7 +601,7 @@ result of the exception-transformer is *also* a state-manipulating
 monad:
 -}
 
-instance MonadState s m => MonadState s (ExceptT e m) where
+instance (MonadState s m) => MonadState s (ExceptT e m) where
   get :: ExceptT e m s
   get = lift get
 

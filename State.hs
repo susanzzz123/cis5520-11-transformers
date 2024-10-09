@@ -1,7 +1,6 @@
 {-
 ---
 fulltitle: A Generic State Transformer
-date:
 ---
 
 This file goes with [`StateMonad`](StateMonad.html).
