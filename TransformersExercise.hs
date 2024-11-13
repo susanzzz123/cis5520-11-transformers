@@ -61,23 +61,28 @@ Expression Evaluator
 type Store = Map Var Value
 
 -- TODO: remove the type annotation of `evalE` to reveal a more general type for this function
-evalE :: Expression -> State Store Value
+evalE :: (MonadState (Map Var Value) m, MonadError Value m) => Expression -> m Value
 evalE (Var x) = do
   m <- get
   case Map.lookup x m of
     Just v -> return v
-    Nothing -> return NilVal -- TODO: replace with `throwError (IntVal 0)`
+    Nothing -> throwError (IntVal 0) -- TODO: replace with `throwError (IntVal 0)`
 evalE (Val v) = return v
-evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
+evalE (Op2 e1 o e2) = do
+  v1 <- evalE e1
+  v2 <- evalE e2
+  evalOp2 o v1 v2
+  -- evalOp2 o <$> evalE e1 <*> evalE e2
 
 -- TODO: When you edit this function to use `throwError`, the type needs to
 -- change.
-evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
-evalOp2 Minus (IntVal i1) (IntVal i2) = IntVal (i1 - i2)
-evalOp2 Times (IntVal i1) (IntVal i2) = IntVal (i1 * i2)
-evalOp2 Divide (IntVal _) (IntVal 0) = NilVal -- return nil for divide by 0
-evalOp2 Divide (IntVal i1) (IntVal i2) = IntVal (i1 `div` i2)
-evalOp2 _ _ _ = NilVal -- invalid args
+evalOp2 :: MonadError Value m => Bop -> Value -> Value -> m Value
+evalOp2 Plus (IntVal i1) (IntVal i2) = return $ IntVal (i1 + i2)
+evalOp2 Minus (IntVal i1) (IntVal i2) = return $ IntVal (i1 - i2)
+evalOp2 Times (IntVal i1) (IntVal i2) = return $ IntVal (i1 * i2)
+evalOp2 Divide (IntVal _) (IntVal 0) = throwError $ IntVal 1 -- return nil for divide by 0
+evalOp2 Divide (IntVal i1) (IntVal i2) = return $ IntVal (i1 `div` i2)
+evalOp2 _ _ _ = throwError $ IntVal 2 -- invalid args
 
 {-
 2. Next, modify `evalOp2` and `evalE` above so that they use `throwError` (from the `MonadError` class) for runtime errors
@@ -108,7 +113,7 @@ executeE :: Expression -> Store -> (Either Value Value, Store)
 executeE e = runState (runExceptT comp)
   where
     comp :: M Value
-    comp = undefined -- replace this with `evalE e`
+    comp = evalE e -- replace this with `evalE e`
 
 {-
 We can display the errors nicely for experimentation in ghci with
@@ -124,9 +129,11 @@ For example, try these out:
 
 -- "1 / 0"
 -- >>> display (fst (executeE (Op2  (Val (IntVal 1)) Divide (Val (IntVal 0))) Map.empty))
+-- "Uncaught exception: Divide by zero"
 
 -- "1 / 1"
 -- >>> display (fst (executeE (Op2  (Val (IntVal 1)) Divide (Val (IntVal 1))) Map.empty))
+-- "Result: IntVal 1"
 
 {-
 We can also write tests that expect a particular execution to
@@ -165,6 +172,7 @@ test_expErrors =
     ~: TestList [test_undefined, test_divByZero, test_badPlus]
 
 -- >>> runTestTT test_expErrors
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
 {-
 Statement Evaluator
@@ -194,8 +202,18 @@ evalS w@(While e ss) = do
   when (evalCondition v) $ do
     eval ss
     evalS w
-evalS (Try _ _ _) = undefined
-evalS (Throw _) = undefined
+evalS (Try (Block b1) v (Block b2)) = do
+  s <- get
+  let (either, s') = execute (Block b1) s in
+    case either of
+      Left err ->
+        put s' *>
+        eval (Block (Assign v (Val err) : b2))
+      _ ->
+        put s'
+evalS (Throw e) = do
+  e' <- evalE e
+  throwError e'
 
 -- type annotation intentionally not given
 eval (Block ss) = mapM_ evalS ss
@@ -206,7 +224,7 @@ eval (Block ss) = mapM_ evalS ss
 -}
 
 execute :: Block -> Store -> (Either Value (), Store)
-execute b st = undefined
+execute b = runState (runExceptT $ eval b)
 
 {-
 Try out your `execute` with this operation:
@@ -222,6 +240,7 @@ For example:
 -}
 
 -- >>> run $ Block [While badPlus (Block [])]
+-- "Uncaught exception: Invalid arguments to operator,  Store: fromList []"
 
 {-
 Test your functions with this helper
@@ -243,8 +262,10 @@ test_badIf :: Test
 test_badIf = Block [If divByZero (Block []) (Block [])] `raises` IntVal 1
 
 -- >>> runTestTT test_badWhile
+-- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
 
 -- >>> runTestTT test_badIf
+-- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
 
 {-
 5. Add user-level exceptions
@@ -286,6 +307,7 @@ tryExpr :: Block
 tryExpr = Block [Assign "x" (Val (IntVal 0)), Assign "y" (Val (IntVal 1)), Try (Block [If (Op2 (Var "x") Plus (Var "y")) (Block [Assign "a" (Val (IntVal 100)), Throw (Op2 (Var "x") Plus (Var "y")), Assign "b" (Val (IntVal 200))]) (Block [])]) "e" (Block [Assign "z" (Op2 (Var "e") Plus (Var "a"))])]
 
 -- >>> run tryExpr
+-- "Result: (),  Store: fromList [(\"a\",IntVal 100),(\"e\",IntVal 1),(\"x\",IntVal 0),(\"y\",IntVal 1),(\"z\",IntVal 101)]"
 
 {-
 Should print

@@ -69,8 +69,10 @@ second fails with a divide-by-zero exception.
 -}
 
 -- >>> eval ok
+-- 42
 
 -- >>> eval err
+-- divide by zero
 
 {-
 This `eval` function is not very good because it can blow up with a
@@ -106,9 +108,14 @@ errorS :: (Show a) => a -> a -> String
 errorS y m = "Error dividing " ++ show y ++ " by " ++ show m
 
 -- | exception-throwing evaluator
-evalEx :: Expr -> Either String Int
+evalEx :: MonadError String m => Expr -> m Int
 evalEx (Val n) = return n
-evalEx (Div x y) = undefined
+evalEx (Div x y) = do
+  x' <- evalEx x
+  y' <- evalEx y
+  if y' == 0 then throwError (errorS x y)
+  else return (x' `div` y')
+
 
 {-
 When we call this evaluator, we'll format its result into a string using the
@@ -171,12 +178,12 @@ tickProf = do
 Now we can write a *profiling* evaluator, and observe it at work.
 -}
 
-evalSt :: Expr -> State Store Int
+evalSt :: MonadState Int m => Expr -> m Int
 evalSt (Val n) = return n
 evalSt (Div x y) = do
   m <- evalSt x
   n <- evalSt y
-  tickProf
+  tickMonadState
   return (m `div` n)
 
 {-
@@ -322,11 +329,10 @@ evalMega (Val n) = return n
 evalMega (Div x y) = do
   n <- evalMega x
   m <- evalMega y
-  if m == 0
-    then throwError $ errorS n m
-    else do
-      tickMonadState
-      return (n `div` m)
+  if m == 0 then throwError $ errorS n m
+  else do
+    tickMonadState
+    return (n `div` m)
 
 {-
 Note that it is simply the combination of the two evaluators from before -- we
@@ -354,9 +360,13 @@ newtype Mega a = Mega {runMega :: Int -> Either String (a, Int)}
 
 instance Monad Mega where
   return :: a -> Mega a
-  return x = undefined
+  return x = Mega $ \i -> return (x, i)
   (>>=) :: Mega a -> (a -> Mega b) -> Mega b
-  ma >>= fmb = undefined
+  ma >>= fmb = Mega $ \i ->
+    let x = runMega ma i in
+      do
+        (a, b) <- x
+        runMega (fmb a) b
 
 instance Applicative Mega where
   pure = return
@@ -367,11 +377,11 @@ instance Functor Mega where
 
 instance MonadError String Mega where
   throwError :: String -> Mega a
-  throwError str = undefined
+  throwError str = Mega $ \i -> Left str
 
 instance MonadState Int Mega where
-  get = undefined
-  put x = undefined
+  get = Mega $ \i -> return (i, i)
+  put x = Mega $ \_ -> return ((), x)
 
 {-
 Finally, once we have a Mega monad, we can run it and display the result.
@@ -515,13 +525,15 @@ instance (Monad m) => MonadState s (StateT s m) where
   get = MkStateT getIt
     where
       getIt :: s -> m (s, s)
-      getIt s = undefined
+      getIt s = do
+        return (s, s)
 
   put :: s -> StateT s m ()
   put s = MkStateT putIt
     where
       putIt :: s -> m ((), s)
-      putIt _ = undefined
+      putIt _ = do
+        return ((), s)
 
 {-
 Where are we now?
@@ -688,8 +700,8 @@ any other.
 newtype Id a = MkId a deriving (Show)
 
 instance Monad Id where
-  return x = undefined
-  (MkId p) >>= f = undefined
+  return x = MkId x
+  (MkId p) >>= f = f p
 
 instance Applicative Id where
   pure = return
